@@ -19,7 +19,7 @@ uri = f"postgresql+psycopg2://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
 alchemyEngine=create_engine(uri)
 
 # Query
-q = """SELECT * FROM information_schema"""
+q = """SELECT * FROM information_schema.tables"""
 
 dbConnection = alchemyEngine.connect(); 
 
