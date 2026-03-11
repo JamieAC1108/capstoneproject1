@@ -5,6 +5,8 @@ import os
 from sqlalchemy import create_engine
 from urllib.parse import quote_plus
 from dotenv import load_dotenv
+import dash
+from dash import html, Input, Output, dash_table
 
 load_dotenv()
 db_host = os.getenv('db_host')
@@ -13,16 +15,65 @@ db_user = os.getenv('db_user')
 db_pass = os.getenv('db_pass')
 db_port = os.getenv('db_port')
 
-print(db_host, db_name, db_user, db_pass, db_port); 
+def update(n):
+    if n:
+        return "Button Clicked!"
+    return ""
 
-uri = f"postgresql+psycopg2://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
-alchemyEngine=create_engine(uri)
 
-# Query
-q = """SELECT * FROM information_schema.tables"""
+def get_tables():
+    uri = f"postgresql+psycopg2://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
+    engine = create_engine(uri)
 
-dbConnection = alchemyEngine.connect(); 
+    q = "SELECT * FROM information_schema.tables"
 
-df=pd.read_sql(q, dbConnection); # Pulling data
+    with engine.connect() as conn:
+        df = pd.read_sql(q, conn)
 
-print(df.head())
+    return df
+
+app = dash.Dash(__name__)
+
+app.layout = html.Div([
+    html.H1("Information Navigation"),
+
+    html.Button("Show Tables", id="tables_button"),
+    html.Button("Other Page", id="other_button"),
+
+    html.Hr(),
+
+    html.Div(id="content")
+])
+
+@app.callback(
+    Output("content", "children"),
+    Input("tables_button", "n_clicks"),
+    Input("other_button", "n_clicks"),
+)
+
+def update_page(tables, other):
+
+    ctx = dash.callback_context
+
+    if not ctx.triggered:
+        return "Click a button"
+    
+    button_id = ctx.triggered[0]["prop_id"].split(".")[0]
+
+    if button_id == "tables_button":
+        df = get_tables()
+        
+        return dash_table.DataTable(
+            data = df.to_dict("records"),
+            columns=[{"name": col, "id": col} for col in df.columns],
+            page_size = 20
+        )
+    
+    elif button_id == "other_button":
+        return "Another Page"
+    
+    return "Click a button"
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
