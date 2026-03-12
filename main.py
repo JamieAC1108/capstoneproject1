@@ -69,8 +69,8 @@ def update_page(tables, other):
             columns=[{"name": col, "id": col} for col in df.columns],
             page_size=20,
             sort_action="native",
-            page_current=0,  # Reset page to 0
-            page_count=(len(df) // 20) + 1  # Calculate the number of pages
+            page_current=0,
+            page_count=(len(df) // 20) + 1
         )
     
     elif button_id == "other_button":
@@ -106,16 +106,13 @@ def display_table(active_cell, sort_by, page_current):
     if active_cell is None:
         return dash.no_update
 
-    # Fetch the table names and respect the current page
     tables_df = get_tables()
 
-    # Apply sorting
     if sort_by:
         column_id = sort_by[0]["column_id"]
         direction = sort_by[0]["direction"]
         tables_df = tables_df.sort_values(by=column_id, ascending=(direction == 'asc')).reset_index(drop=True)
 
-    # Apply pagination: slice based on current page
     start_row = page_current * 20
     end_row = start_row + 20
     tables_page_df = tables_df.iloc[start_row:end_row]
