@@ -25,7 +25,11 @@ def get_tables():
     uri = f"postgresql+psycopg2://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
     engine = create_engine(uri)
 
-    q = "SELECT * FROM information_schema.tables"
+    q = """
+    SELECT table_schema, table_name
+    FROM information_schema.tables  
+    ORDER BY table_name
+    """
 
     with engine.connect() as conn:
         df = pd.read_sql(q, conn)
@@ -51,6 +55,35 @@ app.layout = html.Div([
     Input("other_button", "n_clicks"),
 )
 
+@app.callback(
+    Output("content", "children", allow_duplicate=True),
+    Input("tables_list", "active_cell"),
+    prevent_initial_call=True
+)
+
+def display_table(active_cell): 
+
+    if active_cell is None:
+        return dash.no_update
+    
+    row = active_cell["row"]
+
+    tables_df = get_tables()
+    table_name = tables_df.iloc[row]["table_name"]
+
+    df = load_table(table_name)
+
+    return html.Div([
+        html.H3(f"Viewing table: {table_name}"),
+
+        dash_table.DataTable(
+            data=df.to_dict("records"),
+            columns=[{"name": col, "id": col} for col in df.columns],
+            page_size=20,
+            style_table={"overflowX": "auto"}
+        )
+    ])
+
 def update_page(tables, other):
 
     ctx = dash.callback_context
@@ -66,7 +99,8 @@ def update_page(tables, other):
         return dash_table.DataTable(
             data = df.to_dict("records"),
             columns=[{"name": col, "id": col} for col in df.columns],
-            page_size = 20
+            page_size = 20,
+            sort_action="native"
         )
     
     elif button_id == "other_button":
@@ -74,6 +108,19 @@ def update_page(tables, other):
     
     return "Click a button"
 
+def load_table(table_name):
+    uri = f"postgresql+psycopg2://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
+    engine = create_engine(uri)
+
+    q = f"""
+    SELECT * FROM "{table_name}" LIMIT 100"
+    """
+
+    with engine.connect() as conn:
+        df = pd.read_sql(q, conn)
+
+    return df
+    
 
 if __name__ == "__main__":
     app.run(debug=True)
