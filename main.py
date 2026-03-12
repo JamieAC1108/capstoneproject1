@@ -1,4 +1,3 @@
-# Imports
 import pandas as pd
 import psycopg2
 import os
@@ -20,7 +19,6 @@ def update(n):
         return "Button Clicked!"
     return ""
 
-
 def get_tables():
     uri = f"postgresql+psycopg2://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
     engine = create_engine(uri)
@@ -36,13 +34,13 @@ def get_tables():
 
     return df
 
-app = dash.Dash(__name__)
+app = dash.Dash(__name__, suppress_callback_exceptions=True)
 
 app.layout = html.Div([
     html.H1("Information Navigation"),
 
     html.Button("Show Tables", id="tables_button"),
-    html.Button("Other Page", id="other_button"),
+    html.Button("About", id="other_button"),
 
     html.Hr(),
 
@@ -54,38 +52,7 @@ app.layout = html.Div([
     Input("tables_button", "n_clicks"),
     Input("other_button", "n_clicks"),
 )
-
-@app.callback(
-    Output("content", "children", allow_duplicate=True),
-    Input("tables_list", "active_cell"),
-    prevent_initial_call=True
-)
-
-def display_table(active_cell): 
-
-    if active_cell is None:
-        return dash.no_update
-    
-    row = active_cell["row"]
-
-    tables_df = get_tables()
-    table_name = tables_df.iloc[row]["table_name"]
-
-    df = load_table(table_name)
-
-    return html.Div([
-        html.H3(f"Viewing table: {table_name}"),
-
-        dash_table.DataTable(
-            data=df.to_dict("records"),
-            columns=[{"name": col, "id": col} for col in df.columns],
-            page_size=20,
-            style_table={"overflowX": "auto"}
-        )
-    ])
-
 def update_page(tables, other):
-
     ctx = dash.callback_context
 
     if not ctx.triggered:
@@ -97,27 +64,91 @@ def update_page(tables, other):
         df = get_tables()
         
         return dash_table.DataTable(
+            id="tables_list",
             data = df.to_dict("records"),
             columns=[{"name": col, "id": col} for col in df.columns],
-            page_size = 20,
-            sort_action="native"
+            page_size=20,
+            sort_action="native",
+            page_current=0,  # Reset page to 0
+            page_count=(len(df) // 20) + 1  # Calculate the number of pages
         )
     
     elif button_id == "other_button":
-        return "Another Page"
+        return html.Div([
+            html.H3("About This App"),
+            html.P("""
+                This app was a process to create. We had to connect to the database, figure out
+                how to navigate it using dash, then do all the stylizing. Nonetheless, this was
+                a wonderful learning experience.
+                """),
+            html.P("""                 
+                Simply click on the table names in order to pull up a specific table. You can order it alphabetically, 
+                in both ascending and descending fashion.
+                """),
+            html.P("Version 1.0"),
+            html.P("Created by Jamie Cole and Theodore (Teddy) Robillard"),
+            html.Nav([
+                html.A("Contact Jamie ", href="mailto:jamie.cole@mainecc.edu"),
+                html.A(" Contact Teddy", href="mailto:theodore.robillard@mainecc.edu"),
+            ])
+        ])
     
     return "Click a button"
 
-def load_table(table_name):
+@app.callback(
+    Output("content", "children", allow_duplicate=True),
+    Input("tables_list", "active_cell"),
+    Input("tables_list", "sort_by"),
+    Input("tables_list", "page_current"),  # Add page_current here
+    prevent_initial_call=True
+)
+def display_table(active_cell, sort_by, page_current): 
+    if active_cell is None:
+        return dash.no_update
+
+    # Fetch the table names and respect the current page
+    tables_df = get_tables()
+
+    # Apply sorting
+    if sort_by:
+        column_id = sort_by[0]["column_id"]
+        direction = sort_by[0]["direction"]
+        tables_df = tables_df.sort_values(by=column_id, ascending=(direction == 'asc')).reset_index(drop=True)
+
+    # Apply pagination: slice based on current page
+    start_row = page_current * 20
+    end_row = start_row + 20
+    tables_page_df = tables_df.iloc[start_row:end_row]
+
+    row = active_cell["row"]
+    table_name = tables_page_df.iloc[row]["table_name"]
+    table_schema = tables_page_df.iloc[row]["table_schema"]
+
+    df = load_table(table_name, table_schema)
+
+    return html.Div([
+        html.H3(f"Viewing table: {table_name}"),
+        dash_table.DataTable(
+            data=df.to_dict("records"),
+            columns=[{"name": col, "id": col} for col in df.columns],
+            page_size=20,
+            style_table={"overflowX": "auto"}
+        )
+    ])
+
+def load_table(table_name, table_schema):
     uri = f"postgresql+psycopg2://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
     engine = create_engine(uri)
 
     q = f"""
-    SELECT * FROM "{table_name}" LIMIT 100"
-    """
+    SELECT * FROM {table_schema}."{table_name}" LIMIT 100
+    """ 
 
     with engine.connect() as conn:
-        df = pd.read_sql(q, conn)
+        try:
+            df = pd.read_sql(q, conn)
+        except Exception as e:
+            return pd.DataFrame()
 
     return df
     
