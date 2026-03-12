@@ -86,11 +86,7 @@ def update_page(tables, other):
                 in both ascending and descending fashion.
                 """),
             html.P("Version 1.0"),
-            html.P("Created by Jamie Cole and Theodore (Teddy) Robillard"),
-            html.Nav([
-                html.A("Contact Jamie ", href="mailto:jamie.cole@mainecc.edu"),
-                html.A(" Contact Teddy", href="mailto:theodore.robillard@mainecc.edu"),
-            ])
+            html.P("Created by Jamie Cole and Theodore (Teddy) Robillard")
         ])
     
     return "Click a button"
